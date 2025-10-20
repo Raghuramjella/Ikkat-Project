@@ -21,10 +21,86 @@ export default function Checkout() {
     },
     paymentMethod: 'razorpay'
   });
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const total = cart.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
   const tax = Math.round(total * 0.18);
   const finalTotal = total + tax;
+
+  const loadRazorpayScript = () => {
+    if (window.Razorpay) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Razorpay SDK failed to load.'));
+      document.body.appendChild(script);
+    });
+  };
+
+  const startRazorpayCheckout = async (order, payment) => {
+    try {
+      setPaymentLoading(true);
+      await loadRazorpayScript();
+
+      const options = {
+        key: process.env.REACT_APP_RAZORPAY_KEY,
+        amount: payment.amount,
+        currency: payment.currency,
+        name: 'IkkatBazaar',
+        description: 'Order Payment',
+        order_id: payment.orderId,
+        prefill: {
+          name: formData.shippingAddress.name,
+          email: user?.email,
+          contact: formData.shippingAddress.phone
+        },
+        notes: {
+          orderId: order._id,
+          paymentMethod: formData.paymentMethod
+        },
+        handler: async function (response) {
+          try {
+            await client.post(`/orders/${order._id}/payment/verify`, {
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              paymentMethod: formData.paymentMethod
+            });
+            clearCart();
+            navigate('/orders', { state: { highlightedOrderId: order._id, order } });
+          } catch (verifyError) {
+            setError(verifyError.response?.data?.message || 'Payment verification failed');
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentLoading(false);
+          }
+        },
+        theme: {
+          color: '#F97316'
+        }
+      };
+
+      if (formData.paymentMethod === 'upi') {
+        options.method = {
+          upi: true,
+          card: false,
+          netbanking: false,
+          wallet: false
+        };
+      }
+
+      const razorpayInstance = new window.Razorpay(options);
+      razorpayInstance.open();
+    } catch (paymentError) {
+      setError(paymentError.message || 'Unable to initiate payment');
+      setPaymentLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,8 +134,15 @@ export default function Checkout() {
       };
 
       const { data } = await client.post('/orders', orderData);
+
+      if (formData.paymentMethod === 'razorpay' || formData.paymentMethod === 'upi') {
+        const { order, payment } = data;
+        await startRazorpayCheckout(order, payment);
+        return;
+      }
+
       clearCart();
-      navigate(`/orders/${data.order._id}`, { state: { order: data.order } });
+      navigate('/orders', { state: { highlightedOrderId: data.order._id, order: data.order } });
     } catch (err) {
       setError(err.response?.data?.message || 'Order creation failed');
     } finally {

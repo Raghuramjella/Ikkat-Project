@@ -28,6 +28,9 @@ export default function Navbar() {
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-6">
             <Link to="/products" className="hover:text-orange-100 transition">Products</Link>
+            {user?.role === 'customer' && (
+              <Link to="/orders" className="hover:text-orange-100 transition">My Orders</Link>
+            )}
             <Link to="/cart" className="relative hover:text-orange-100 transition">
               <FiShoppingCart size={24} />
               {cart.length > 0 && (
@@ -81,6 +84,9 @@ export default function Navbar() {
         {isOpen && (
           <div className="md:hidden pb-4 space-y-2">
             <Link to="/products" className="block hover:text-orange-100 transition py-2">Products</Link>
+            {user?.role === 'customer' && (
+              <Link to="/orders" className="block hover:text-orange-100 transition py-2">My Orders</Link>
+            )}
             <Link to="/cart" className="block hover:text-orange-100 transition py-2">
               Cart ({cart.length})
             </Link>

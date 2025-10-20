@@ -36,7 +36,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['razorpay', 'bank-transfer', 'cod'],
+    enum: ['razorpay', 'upi', 'bank-transfer', 'cod'],
     default: 'razorpay'
   },
   paymentStatus: {
@@ -45,6 +45,11 @@ const orderSchema = new mongoose.Schema({
     default: 'pending'
   },
   paymentId: String,
+  gatewayOrderId: String,
+  paymentNotes: {
+    type: Map,
+    of: String
+  },
   orderStatus: {
     type: String,
     enum: ['placed', 'confirmed', 'shipped', 'delivered', 'cancelled'],

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FiCheck, FiX } from 'react-icons/fi';
+import { getArtisans, verifyArtisan } from '../api/admin';
 
 export default function AdminArtisans() {
   const navigate = useNavigate();
@@ -21,19 +22,15 @@ export default function AdminArtisans() {
   }, [filter]);
 
   const fetchArtisans = async () => {
+    setLoading(true);
     try {
-      let url = 'http://localhost:5000/api/admin/artisans';
-      if (filter !== 'all') {
-        url += `?status=${filter}`;
-      }
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const { data } = await getArtisans(filter);
       setArtisans(data);
+      setMessage('');
     } catch (error) {
       console.error('Error fetching artisans:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Error fetching artisans. Please try again.';
+      setMessage(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -41,27 +38,21 @@ export default function AdminArtisans() {
 
   const handleVerification = async (artisanId, status) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/artisans/${artisanId}/verify`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          status,
-          verificationNotes
-        })
+      const notes = selectedArtisan === artisanId ? verificationNotes.trim() : '';
+      const { data } = await verifyArtisan(artisanId, {
+        status,
+        verificationNotes: notes
       });
 
-      if (response.ok) {
-        setMessage(`Artisan ${status} successfully`);
-        setSelectedArtisan(null);
-        setVerificationNotes('');
-        fetchArtisans();
-        setTimeout(() => setMessage(''), 3000);
-      }
+      setMessage(data.message || `Artisan ${status} successfully`);
+      setSelectedArtisan(null);
+      setVerificationNotes('');
+      await fetchArtisans();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage('Error updating artisan verification');
+      console.error('Error updating artisan verification:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Error updating artisan verification';
+      setMessage(errorMsg);
     }
   };
 

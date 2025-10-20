@@ -1,9 +1,10 @@
 const express = require('express');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, authorizeRole } = require('../middleware/auth');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
+const Artisan = require('../models/Artisan');
 
 const router = express.Router();
 
@@ -55,6 +56,46 @@ router.post('/', authenticate, async (req, res) => {
 
     await order.save();
 
+    if (paymentMethod === 'razorpay' || paymentMethod === 'upi') {
+      try {
+        const razorpayOrder = await razorpay.orders.create({
+          amount: finalAmount * 100,
+          currency: 'INR',
+          receipt: `IB-${order._id}`,
+          notes: {
+            orderId: order._id.toString(),
+            customerId: req.user.id,
+            paymentMethod
+          }
+        });
+
+        order.gatewayOrderId = razorpayOrder.id;
+        order.paymentNotes = razorpayOrder.notes;
+        order.paymentStatus = 'pending';
+        await order.save();
+
+        return res.status(201).json({
+          message: 'Order created',
+          order,
+          payment: {
+            gateway: 'razorpay',
+            orderId: razorpayOrder.id,
+            amount: razorpayOrder.amount,
+            currency: razorpayOrder.currency
+          }
+        });
+      } catch (gatewayError) {
+        console.error('Razorpay order creation failed:', gatewayError);
+        await Order.findByIdAndDelete(order._id);
+        return res.status(500).json({ message: 'Payment initialization failed, please try again.' });
+      }
+    }
+
+    if (paymentMethod === 'cod' || paymentMethod === 'bank-transfer') {
+      order.paymentStatus = paymentMethod === 'cod' ? 'pending' : 'pending';
+      await order.save();
+    }
+
     res.status(201).json({ message: 'Order created', order });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -98,14 +139,25 @@ router.get('/customer/my-orders', authenticate, async (req, res) => {
 });
 
 // Get artisan orders (orders containing their products)
-router.get('/artisan/orders', authenticate, async (req, res) => {
+router.get('/artisan/orders', authenticate, authorizeRole('artisan'), async (req, res) => {
   try {
-    const orders = await Order.find({ 'items.artisanId': req.user.id })
+    const artisan = await Artisan.findOne({ userId: req.user.id });
+
+    if (!artisan) {
+      return res.status(404).json({ message: 'Artisan profile not found' });
+    }
+
+    const orders = await Order.find({ 'items.artisanId': artisan._id })
       .populate('customerId', 'name email phone address')
       .populate('items.productId', 'name images finalPrice')
       .sort({ createdAt: -1 });
 
-    res.json(orders);
+    const mappedOrders = orders.map(order => ({
+      ...order.toObject(),
+      items: order.items.filter(item => item.artisanId.toString() === artisan._id.toString())
+    }));
+
+    res.json(mappedOrders);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -134,7 +186,12 @@ router.patch('/:orderId/status', authenticate, async (req, res) => {
       }
     } else if (req.user.role === 'artisan' || req.user.role === 'admin') {
       // Verify artisan has items in this order
-      const hasItems = order.items.some(item => item.artisanId.toString() === req.user.id);
+      const artisan = await Artisan.findOne({ userId: req.user.id });
+      if (!artisan && req.user.role !== 'admin') {
+        return res.status(404).json({ message: 'Artisan profile not found' });
+      }
+
+      const hasItems = order.items.some(item => item.artisanId.toString() === (artisan?._id?.toString() || ''));
       if (!hasItems && req.user.role !== 'admin') {
         return res.status(403).json({ message: 'Unauthorized' });
       }
@@ -193,20 +250,27 @@ router.post('/:orderId/payment/create', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    // Create Razorpay order
-    const razorpayOrder = await razorpay.orders.create({
-      amount: order.finalAmount * 100, // Amount in paise
-      currency: 'INR',
-      receipt: `IB-${order._id}`,
-      notes: {
-        orderId: order._id.toString(),
-        customerId: req.user.id
-      }
-    });
+    if (!order.gatewayOrderId) {
+      const razorpayOrder = await razorpay.orders.create({
+        amount: order.finalAmount * 100,
+        currency: 'INR',
+        receipt: `IB-${order._id}`,
+        notes: {
+          orderId: order._id.toString(),
+          customerId: req.user.id,
+          paymentMethod: order.paymentMethod
+        }
+      });
+
+      order.gatewayOrderId = razorpayOrder.id;
+      order.paymentNotes = razorpayOrder.notes;
+      order.paymentStatus = 'pending';
+      await order.save();
+    }
 
     res.json({
-      message: 'Payment order created',
-      razorpayOrderId: razorpayOrder.id,
+      message: 'Payment order ready',
+      razorpayOrderId: order.gatewayOrderId,
       amount: order.finalAmount,
       orderId: order._id
     });
@@ -215,10 +279,10 @@ router.post('/:orderId/payment/create', authenticate, async (req, res) => {
   }
 });
 
-// Verify UPI payment (webhook or client verification)
+// Verify payment (client-side verification)
 router.post('/:orderId/payment/verify', authenticate, async (req, res) => {
   try {
-    const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, paymentMethod } = req.body;
     const order = await Order.findById(req.params.orderId);
 
     if (!order) {
@@ -229,7 +293,6 @@ router.post('/:orderId/payment/verify', authenticate, async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    // Verify signature
     const body = razorpayOrderId + '|' + razorpayPaymentId;
     const expectedSignature = crypto
       .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
@@ -240,10 +303,10 @@ router.post('/:orderId/payment/verify', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Payment verification failed' });
     }
 
-    // Update order with payment details
     order.paymentId = razorpayPaymentId;
     order.paymentStatus = 'completed';
     order.orderStatus = 'confirmed';
+    order.paymentMethod = paymentMethod || order.paymentMethod;
     order.updatedAt = new Date();
     await order.save();
 

@@ -2,6 +2,7 @@ const express = require('express');
 const { authenticate, authorizeRole } = require('../middleware/auth');
 const Artisan = require('../models/Artisan');
 const User = require('../models/User');
+const Product = require('../models/Product');
 
 const router = express.Router();
 
@@ -82,6 +83,27 @@ router.get('/profile', authenticate, authorizeRole('artisan'), async (req, res) 
       return res.status(404).json({ message: 'Profile not found' });
     }
     res.json(artisan);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get artisan products
+router.get('/products', authenticate, authorizeRole('artisan'), async (req, res) => {
+  try {
+    const artisan = await Artisan.findOne({ userId: req.user.id });
+
+    if (!artisan) {
+      return res.status(404).json({ message: 'Artisan profile not found' });
+    }
+
+    if (artisan.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'Your artisan profile must be verified before accessing products.' });
+    }
+
+    const products = await Product.find({ artisanId: artisan._id }).sort({ createdAt: -1 });
+
+    res.json({ products });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

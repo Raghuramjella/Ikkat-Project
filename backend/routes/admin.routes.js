@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { authenticate, authorizeRole } = require('../middleware/auth');
 const Artisan = require('../models/Artisan');
 const User = require('../models/User');
@@ -165,19 +166,26 @@ router.post('/artisans/:artisanId/verify', authenticate, authorizeRole('admin'),
     const { artisanId } = req.params;
     const { verificationNotes, status } = req.body;
 
+    const updatePayload = {
+      verificationStatus: status,
+      verificationNotes,
+      verifiedAt: new Date()
+    };
+
+    if (mongoose.Types.ObjectId.isValid(req.user.id)) {
+      updatePayload.verifiedBy = req.user.id;
+    }
+
     const artisan = await Artisan.findByIdAndUpdate(
       artisanId,
-      {
-        verificationStatus: status,
-        verificationNotes,
-        verifiedBy: req.user.id,
-        verifiedAt: new Date()
-      },
+      updatePayload,
       { new: true }
     );
 
     // Update user verification status
-    await User.findByIdAndUpdate(artisan.userId, { isVerified: status === 'verified' });
+    if (artisan?.userId) {
+      await User.findByIdAndUpdate(artisan.userId, { isVerified: status === 'verified' });
+    }
 
     res.json({ message: 'Artisan verification updated', artisan });
   } catch (error) {

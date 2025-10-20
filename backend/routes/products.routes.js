@@ -16,6 +16,13 @@ router.post('/', authenticate, authorizeRole('artisan'), async (req, res) => {
       return res.status(400).json({ message: 'Artisan profile not found' });
     }
 
+    if (artisan.verificationStatus !== 'verified') {
+      return res.status(403).json({
+        message: 'Your artisan profile must be verified before adding products.',
+        verificationStatus: artisan.verificationStatus
+      });
+    }
+
     const product = new Product({
       artisanId: artisan._id,
       name,
@@ -86,7 +93,18 @@ router.get('/:productId', async (req, res) => {
 router.put('/:productId', authenticate, authorizeRole('artisan'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
     const artisan = await Artisan.findOne({ userId: req.user.id });
+    if (!artisan) {
+      return res.status(400).json({ message: 'Artisan profile not found' });
+    }
+
+    if (artisan.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'Your artisan profile must be verified before managing products.' });
+    }
 
     if (product.artisanId.toString() !== artisan._id.toString()) {
       return res.status(403).json({ message: 'Unauthorized' });
@@ -108,7 +126,18 @@ router.put('/:productId', authenticate, authorizeRole('artisan'), async (req, re
 router.delete('/:productId', authenticate, authorizeRole('artisan'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
     const artisan = await Artisan.findOne({ userId: req.user.id });
+    if (!artisan) {
+      return res.status(400).json({ message: 'Artisan profile not found' });
+    }
+
+    if (artisan.verificationStatus !== 'verified') {
+      return res.status(403).json({ message: 'Your artisan profile must be verified before managing products.' });
+    }
 
     if (product.artisanId.toString() !== artisan._id.toString()) {
       return res.status(403).json({ message: 'Unauthorized' });

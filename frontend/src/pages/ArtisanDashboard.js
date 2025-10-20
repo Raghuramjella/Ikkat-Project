@@ -12,6 +12,8 @@ export default function ArtisanDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
 
+  const isVerified = profile?.verificationStatus === 'verified';
+
   useEffect(() => {
     if (!user || user.role !== 'artisan') navigate('/');
     fetchData();
@@ -21,7 +23,7 @@ export default function ArtisanDashboard() {
     try {
       const [profileRes, productsRes, salesRes] = await Promise.all([
         client.get('/artisan/profile'),
-        client.get('/products'),
+        client.get('/artisan/products'),
         client.get('/artisan/sales/summary')
       ]);
       setProfile(profileRes.data);
@@ -38,7 +40,15 @@ export default function ArtisanDashboard() {
 
   return (
     <div className="container-custom py-12">
-      <h1 className="text-3xl font-bold mb-8">Artisan Dashboard</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+        <h1 className="text-3xl font-bold mb-4 md:mb-0">Artisan Dashboard</h1>
+        <button
+          onClick={() => navigate('/artisan/orders')}
+          className="btn-secondary w-full md:w-auto"
+        >
+          Manage Orders
+        </button>
+      </div>
 
       {/* Tabs */}
       <div className="flex space-x-4 mb-8 border-b">
@@ -84,9 +94,19 @@ export default function ArtisanDashboard() {
       {/* Products Tab */}
       {activeTab === 'products' && (
         <div>
-          <button onClick={() => navigate('/artisan/products/create')} className="btn-primary mb-6">
+          <button
+            onClick={() => navigate('/artisan/products/create')}
+            className={`btn-primary mb-6 ${!isVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={!isVerified}
+          >
             + Add New Product
           </button>
+          {!isVerified && (
+            <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-3 rounded mb-6">
+              Your profile is pending verification. You will be able to add and manage products once an administrator approves your account.
+            </div>
+          )}
+
           {products.length === 0 ? (
             <p className="text-gray-600">No products yet</p>
           ) : (
@@ -101,7 +121,13 @@ export default function ArtisanDashboard() {
                   <h3 className="font-bold mb-2">{product.name}</h3>
                   <p className="text-orange-600 font-bold mb-2">₹{product.finalPrice}</p>
                   <p className="text-sm text-gray-600 mb-4">Inventory: {product.inventory.quantity}</p>
-                  <button onClick={() => navigate(`/artisan/products/${product._id}/edit`)} className="btn-secondary w-full text-sm">Edit</button>
+                  <button
+                    onClick={() => navigate(`/artisan/products/${product._id}/edit`)}
+                    className={`btn-secondary w-full text-sm ${!isVerified ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!isVerified}
+                  >
+                    Edit
+                  </button>
                 </div>
               ))}
             </div>
