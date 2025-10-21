@@ -10,8 +10,6 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import OTPVerification from './pages/OTPVerification';
-import ChangePassword from './pages/ChangePassword';
 import ArtisanDashboard from './pages/ArtisanDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
@@ -43,8 +41,6 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/verify-otp" element={<OTPVerification />} />
-            <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/artisan/dashboard" element={<ArtisanDashboard />} />
             <Route path="/artisan/profile/create" element={<ArtisanProfileCreate />} />

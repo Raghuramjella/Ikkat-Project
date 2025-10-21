@@ -131,10 +131,19 @@ router.patch('/products/:productId/toggle', authenticate, authorizeRole('admin')
 // Delete product
 router.delete('/products/:productId', authenticate, authorizeRole('admin'), async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.productId);
+    const product = await Product.findById(req.params.productId);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const artisan = await Artisan.findById(product.artisanId);
+
+    await Product.findByIdAndDelete(req.params.productId);
+
+    if (artisan && typeof artisan.totalProducts === 'number' && artisan.totalProducts > 0) {
+      artisan.totalProducts -= 1;
+      await artisan.save();
     }
 
     res.json({ message: 'Product deleted successfully' });

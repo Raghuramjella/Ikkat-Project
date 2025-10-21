@@ -7,26 +7,22 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [resetToken, setResetToken] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
     setError('');
+    setResetToken('');
 
     try {
-      await client.post('/auth/forgot-password-otp', { email });
-      setSent(true);
-      setMessage('OTP sent successfully to your email!');
-      
-      // Redirect to OTP verification page after 2 seconds
-      setTimeout(() => {
-        navigate('/verify-otp', { state: { email } });
-      }, 2000);
+      const { data } = await client.post('/auth/forgot-password', { email });
+      setResetToken(data.resetToken);
+      setMessage('Password reset token generated! Use it on the Reset Password page.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error sending OTP');
+      setError(err.response?.data?.message || 'Error generating reset token');
     } finally {
       setLoading(false);
     }
@@ -37,7 +33,9 @@ export default function ForgotPassword() {
       <div className="max-w-md mx-auto">
         <div className="card">
           <h2 className="text-3xl font-bold mb-6 text-center">Reset Password</h2>
-          <p className="text-gray-600 text-center mb-6">Enter your email address and we'll send you an OTP to reset your password.</p>
+          <p className="text-gray-600 text-center mb-6">
+            Enter your email address and we'll generate a password reset token for you.
+          </p>
 
           {message && (
             <div className="bg-green-100 text-green-700 p-3 rounded mb-4">
@@ -51,40 +49,48 @@ export default function ForgotPassword() {
             </div>
           )}
 
-          {!sent ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter your email"
-                />
-              </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Enter your email"
+              />
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full btn-primary disabled:opacity-50"
-              >
-                {loading ? 'Sending OTP...' : 'Send OTP'}
-              </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-primary disabled:opacity-50"
+            >
+              {loading ? 'Generating token...' : 'Generate Reset Token'}
+            </button>
 
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                className="w-full btn-secondary"
-              >
-                Back to Login
-              </button>
-            </form>
-          ) : (
-            <div className="space-y-4 text-center">
-              <p className="text-green-600 font-semibold">Check your email for the OTP!</p>
-              <p className="text-gray-600">Redirecting to verification...</p>
+            <button
+              type="button"
+              onClick={() => navigate('/reset-password')}
+              className="w-full btn-secondary"
+            >
+              Go to Reset Password
+            </button>
+          </form>
+
+          {resetToken && (
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Your Reset Token</label>
+              <textarea
+                readOnly
+                value={resetToken}
+                rows="4"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-xs"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Copy this token and paste it on the Reset Password page within 15 minutes.
+              </p>
             </div>
           )}
         </div>
