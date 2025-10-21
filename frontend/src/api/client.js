@@ -1,9 +1,10 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const envApiUrl = process.env.REACT_APP_API_URL || 'https://ikkat-project.onrender.com';
+const normalizedApiUrl = envApiUrl.replace(/\/$/, '');
 
 const client = axios.create({
-  baseURL: API_URL,
+  baseURL: `${normalizedApiUrl}/api`,
   timeout: 10000,
 });
 
