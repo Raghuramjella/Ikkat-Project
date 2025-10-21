@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiFacebook, FiTwitter, FiInstagram, FiMail } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
 
 export default function Footer() {
   return (
@@ -18,10 +19,10 @@ export default function Footer() {
           <div>
             <h3 className="font-bold mb-4">Quick Links</h3>
             <ul className="text-gray-400 text-sm space-y-2">
-              <li><a href="#" className="hover:text-white transition">About Us</a></li>
-              <li><a href="#" className="hover:text-white transition">Contact</a></li>
-              <li><a href="#" className="hover:text-white transition">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-white transition">Terms of Service</a></li>
+              <li><Link to="/about" className="hover:text-white transition">About Us</Link></li>
+              <li><Link to="/contact" className="hover:text-white transition">Contact</Link></li>
+              <li><Link to="/privacy-policy" className="hover:text-white transition">Privacy Policy</Link></li>
+              <li><Link to="/terms-of-service" className="hover:text-white transition">Terms of Service</Link></li>
             </ul>
           </div>
 
@@ -29,10 +30,10 @@ export default function Footer() {
           <div>
             <h3 className="font-bold mb-4">Categories</h3>
             <ul className="text-gray-400 text-sm space-y-2">
-              <li><a href="#" className="hover:text-white transition">Sarees</a></li>
-              <li><a href="#" className="hover:text-white transition">Dupattas</a></li>
-              <li><a href="#" className="hover:text-white transition">Fabrics</a></li>
-              <li><a href="#" className="hover:text-white transition">Accessories</a></li>
+              <li><Link to="/sarees" className="hover:text-white transition">Sarees</Link></li>
+              <li><Link to="/dupattas" className="hover:text-white transition">Dupattas</Link></li>
+              <li><Link to="/fabrics" className="hover:text-white transition">Fabrics</Link></li>
+              <li><Link to="/accessories" className="hover:text-white transition">Accessories</Link></li>
             </ul>
           </div>
 
