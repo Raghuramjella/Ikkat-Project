@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FiEdit2, FiTrash2, FiEye, FiEyeOff } from 'react-icons/fi';
+import client from '../api/client';
 
 export default function AdminProducts() {
   const navigate = useNavigate();
@@ -20,15 +21,8 @@ export default function AdminProducts() {
 
   const fetchProducts = async () => {
     try {
-      let url = 'http://localhost:5000/api/admin/products';
-      if (filter !== 'all') {
-        url += `?status=${filter}`;
-      }
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const params = filter !== 'all' ? { status: filter } : undefined;
+      const { data } = await client.get('/admin/products', { params });
       setProducts(data);
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -39,16 +33,10 @@ export default function AdminProducts() {
 
   const handleToggle = async (productId, isActive) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/products/${productId}/toggle`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (response.ok) {
-        setMessage(`Product ${isActive ? 'deactivated' : 'activated'} successfully`);
-        fetchProducts();
-        setTimeout(() => setMessage(''), 3000);
-      }
+      await client.patch(`/admin/products/${productId}/toggle`);
+      setMessage(`Product ${isActive ? 'deactivated' : 'activated'} successfully`);
+      fetchProducts();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('Error toggling product');
     }
@@ -57,16 +45,10 @@ export default function AdminProducts() {
   const handleDelete = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        const response = await fetch(`http://localhost:5000/api/admin/products/${productId}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-
-        if (response.ok) {
-          setMessage('Product deleted successfully');
-          fetchProducts();
-          setTimeout(() => setMessage(''), 3000);
-        }
+        await client.delete(`/admin/products/${productId}`);
+        setMessage('Product deleted successfully');
+        fetchProducts();
+        setTimeout(() => setMessage(''), 3000);
       } catch (error) {
         setMessage('Error deleting product');
       }

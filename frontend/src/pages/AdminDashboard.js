@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FiLogOut, FiBox, FiUsers, FiShoppingCart, FiBarChart2 } from 'react-icons/fi';
+import client from '../api/client';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -18,10 +19,7 @@ export default function AdminDashboard() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/statistics', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const { data } = await client.get('/admin/statistics');
       setStats(data);
     } catch (error) {
       console.error('Error fetching stats:', error);

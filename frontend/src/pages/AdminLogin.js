@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import client from '../api/client';
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('admin@ikkatbazaar.com');
-  const [password, setPassword] = useState('admin123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,26 +17,15 @@ export default function AdminLogin() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/admin/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
+      const { data } = await client.post('/admin/login', { email, password });
 
       // Store token and redirect
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', 'admin');
       navigate('/admin/dashboard');
     } catch (err) {
-      setError(err.message);
+      const message = err.response?.data?.message || err.message || 'Login failed';
+      setError(message);
     } finally {
       setLoading(false);
     }

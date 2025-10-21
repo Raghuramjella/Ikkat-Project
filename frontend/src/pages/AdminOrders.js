@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FiEdit2 } from 'react-icons/fi';
+import client from '../api/client';
 
 export default function AdminOrders() {
   const navigate = useNavigate();
@@ -24,10 +25,7 @@ export default function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/admin/orders', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+      const { data } = await client.get('/admin/orders');
       setOrders(data);
     } catch (error) {
       console.error('Error fetching orders:', error);
@@ -38,22 +36,12 @@ export default function AdminOrders() {
 
   const handleUpdateStatus = async (orderId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/orders/${orderId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ orderStatus: newStatus })
-      });
-
-      if (response.ok) {
-        setMessage('Order status updated successfully');
-        setEditingOrderId(null);
-        setNewStatus('');
-        fetchOrders();
-        setTimeout(() => setMessage(''), 3000);
-      }
+      await client.patch(`/admin/orders/${orderId}`, { orderStatus: newStatus });
+      setMessage('Order status updated successfully');
+      setEditingOrderId(null);
+      setNewStatus('');
+      fetchOrders();
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
       setMessage('Error updating order status');
     }
