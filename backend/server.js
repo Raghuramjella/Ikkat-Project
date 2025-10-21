@@ -38,9 +38,27 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const resolvePort = () => {
+  if (process.env.PORT) {
+    const parsedPort = parseInt(process.env.PORT, 10);
+    if (!Number.isNaN(parsedPort)) {
+      return parsedPort;
+    }
+  }
+
+  // On Vercel we let the platform choose an available port to avoid collisions.
+  if (process.env.VERCEL) {
+    return 0;
+  }
+
+  return 5000;
+};
+
+const PORT = resolvePort();
+const server = app.listen(PORT, () => {
+  const address = server.address();
+  const actualPort = typeof address === 'object' && address ? address.port : PORT;
+  console.log(`Server running on port ${actualPort}`);
 });
 
 module.exports = app;
