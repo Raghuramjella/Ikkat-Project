@@ -20,7 +20,7 @@ export default function ForgotPassword() {
       setMessage(data.message || 'If this email is registered, an OTP has been sent');
     } catch (err) {
       setError(err.response?.data?.message || 'Error sending OTP');
-      console.log(err.response?.data?.message);
+      console.log(err);
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,7 @@ const { authenticate, authorizeRole } = require('../middleware/auth');
 const Product = require('../models/Product');
 const Artisan = require('../models/Artisan');
 const Order = require('../models/Order');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -173,17 +174,22 @@ router.post('/:productId/review', authenticate, async (req, res) => {
     const hasOrdered = await Order.findOne({
       customerId: req.user.id,
       'items.productId': req.params.productId,
-      orderStatus: { $in: ['confirmed', 'shipped', 'delivered'] }
+      orderStatus: { $in: ['placed', 'confirmed', 'shipped', 'delivered'] }
     });
 
     if (!hasOrdered) {
-      return res.status(403).json({ message: 'You can only review products you have purchased and received' });
+      return res.status(403).json({ message: 'You can only review products you have purchased' });
     }
 
-    // Check if already reviewed
     const alreadyReviewed = product.reviews.some(r => r.customerId.toString() === req.user.id);
     if (alreadyReviewed) {
       return res.status(400).json({ message: 'You have already reviewed this product' });
+    }
+
+    const user = await User.findById(req.user.id).select('name');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
     const updated = await Product.findByIdAndUpdate(
@@ -192,6 +198,7 @@ router.post('/:productId/review', authenticate, async (req, res) => {
         $push: {
           reviews: {
             customerId: req.user.id,
+            customerName: user?.name,
             rating: parseInt(rating),
             comment,
             createdAt: new Date()

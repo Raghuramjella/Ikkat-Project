@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
@@ -27,43 +27,103 @@ import ArtisanProfileEdit from './pages/ArtisanProfileEdit';
 import ArtisanProductCreate from './pages/ArtisanProductCreate';
 import ArtisanProductEdit from './pages/ArtisanProductEdit';
 
+const ToastContext = createContext();
+
+function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  const showToast = useCallback((message, type = 'info', duration = 4000) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    window.setTimeout(() => {
+      dismissToast(id);
+    }, duration);
+  }, [dismissToast]);
+
+  const value = useMemo(() => ({ showToast }), [showToast]);
+
+  const typeStyles = {
+    success: 'bg-green-600',
+    error: 'bg-red-600',
+    warning: 'bg-yellow-600',
+    info: 'bg-slate-800'
+  };
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <div className="fixed bottom-4 right-4 space-y-3 z-50 max-w-sm">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg text-white flex items-center justify-between gap-4 ${typeStyles[toast.type] || typeStyles.info}`}
+          >
+            <span className="text-sm font-medium leading-snug">{toast.message}</span>
+            <button
+              type="button"
+              onClick={() => dismissToast(toast.id)}
+              className="text-lg font-semibold text-white/80 hover:text-white"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within ToastProvider');
+  }
+  return context;
+}
+
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen flex flex-col bg-gray-50">
-          <Navbar />
-          <main className="flex-grow">
-            <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/products/:id" element={<ProductDetail />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/artisan/dashboard" element={<ArtisanDashboard />} />
-            <Route path="/artisan/profile/create" element={<ArtisanProfileCreate />} />
-            <Route path="/artisan/profile/edit" element={<ArtisanProfileEdit />} />
-            <Route path="/artisan/products/create" element={<ArtisanProductCreate />} />
-            <Route path="/artisan/products/:id/edit" element={<ArtisanProductEdit />} />
-            <Route path="/artisan/orders" element={<ArtisanOrders />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/artisans" element={<AdminArtisans />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/profile" element={<CustomerProfile />} />
-            <Route path="/orders" element={<CustomerOrders />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<Checkout />} />
-            <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
-      </Router>
-    </AuthProvider>
+    <ToastProvider>
+      <AuthProvider>
+        <Router>
+          <div className="min-h-screen flex flex-col bg-gray-50">
+            <Navbar />
+            <main className="flex-grow">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/products/:id" element={<ProductDetail />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/artisan/dashboard" element={<ArtisanDashboard />} />
+                <Route path="/artisan/profile/create" element={<ArtisanProfileCreate />} />
+                <Route path="/artisan/profile/edit" element={<ArtisanProfileEdit />} />
+                <Route path="/artisan/products/create" element={<ArtisanProductCreate />} />
+                <Route path="/artisan/products/:id/edit" element={<ArtisanProductEdit />} />
+                <Route path="/artisan/orders" element={<ArtisanOrders />} />
+                <Route path="/admin/login" element={<AdminLogin />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/products" element={<AdminProducts />} />
+                <Route path="/admin/artisans" element={<AdminArtisans />} />
+                <Route path="/admin/orders" element={<AdminOrders />} />
+                <Route path="/profile" element={<CustomerProfile />} />
+                <Route path="/orders" element={<CustomerOrders />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </main>
+            <Footer />
+          </div>
+        </Router>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

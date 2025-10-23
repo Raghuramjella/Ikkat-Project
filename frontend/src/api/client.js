@@ -5,7 +5,7 @@ const normalizedApiUrl = envApiUrl.replace(/\/$/, '');
 
 const client = axios.create({
   baseURL: `${normalizedApiUrl}/api`,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 // Add token to requests

@@ -51,6 +51,7 @@ const productSchema = new mongoose.Schema({
   },
   reviews: [{
     customerId: mongoose.Schema.Types.ObjectId,
+    customerName: String,
     rating: Number,
     comment: String,
     createdAt: { type: Date, default: Date.now }

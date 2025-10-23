@@ -4,6 +4,7 @@ import { FiArrowLeft, FiShoppingCart, FiStar } from 'react-icons/fi';
 import client from '../api/client';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
+import { useToast } from '../App';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -18,6 +19,7 @@ export default function ProductDetail() {
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
   const [reviewMessage, setReviewMessage] = useState('');
   const { addToCart } = useCartStore();
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetchProduct();
@@ -27,16 +29,16 @@ export default function ProductDetail() {
     try {
       const { data: productData } = await client.get(`/products/${id}`);
       setProduct(productData);
-      
-      // Fetch reviews
       try {
         const { data: reviewsData } = await client.get(`/products/${id}/reviews`);
         setReviews(reviewsData.reviews || []);
       } catch (err) {
         console.log('Error fetching reviews:', err);
+        showToast('Unable to load reviews', 'warning');
       }
     } catch (error) {
       console.error('Error fetching product:', error);
+      showToast('Product is unavailable', 'error');
       navigate('/products');
     } finally {
       setLoading(false);
@@ -268,7 +270,7 @@ export default function ProductDetail() {
               <div key={idx} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="font-semibold">{review.customerId?.name || 'Anonymous'}</p>
+                    <p className="font-semibold">{review.customerName || review.customerId?.name || 'Anonymous'}</p>
                     <p className="text-sm text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</p>
                   </div>
                   <div className="flex text-yellow-500">

@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { FiTrash2, FiArrowLeft } from 'react-icons/fi';
 import useCartStore from '../store/cartStore';
 import useAuthStore from '../store/authStore';
+import { useToast } from '../App';
 
 export default function Cart() {
   const { cart, removeFromCart, updateQuantity } = useCartStore();
   const { user } = useAuthStore();
+  const { showToast } = useToast();
   const navigate = useNavigate();
 
   const total = cart.reduce((sum, item) => sum + (item.finalPrice * item.quantity), 0);
@@ -50,14 +52,24 @@ export default function Cart() {
                   <p className="text-gray-600 text-sm mb-2">₹{item.finalPrice}</p>
                   <div className="flex items-center border border-gray-300 rounded w-fit">
                     <button
-                      onClick={() => updateQuantity(item._id, Math.max(1, item.quantity - 1))}
+                      onClick={() => {
+                        const changed = updateQuantity(item._id, Math.max(1, item.quantity - 1));
+                        if (changed) {
+                          showToast('Updated cart quantity', 'info');
+                        }
+                      }}
                       className="px-2 py-1 hover:bg-gray-100"
                     >
                       -
                     </button>
                     <span className="px-3 py-1">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item._id, item.quantity + 1)}
+                      onClick={() => {
+                        const changed = updateQuantity(item._id, item.quantity + 1);
+                        if (changed) {
+                          showToast('Updated cart quantity', 'info');
+                        }
+                      }}
                       className="px-2 py-1 hover:bg-gray-100"
                     >
                       +
@@ -67,7 +79,12 @@ export default function Cart() {
                 <div className="text-right">
                   <p className="font-bold">₹{item.finalPrice * item.quantity}</p>
                   <button
-                    onClick={() => removeFromCart(item._id)}
+                    onClick={() => {
+                      const removed = removeFromCart(item._id);
+                      if (removed) {
+                        showToast('Removed from cart', 'warning');
+                      }
+                    }}
                     className="text-red-600 hover:text-red-700 mt-2"
                   >
                     <FiTrash2 />

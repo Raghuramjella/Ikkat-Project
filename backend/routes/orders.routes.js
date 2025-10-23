@@ -21,12 +21,20 @@ router.post('/', authenticate, async (req, res) => {
 
     let totalAmount = 0;
     const orderItems = [];
+    const stockUpdates = [];
 
-    // Calculate total and prepare items
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) {
         return res.status(404).json({ message: `Product ${item.productId} not found` });
+      }
+
+      if (!product.inventory || typeof product.inventory.quantity !== 'number') {
+        return res.status(400).json({ message: `${product.name} is currently unavailable` });
+      }
+
+      if (product.inventory.quantity < item.quantity) {
+        return res.status(400).json({ message: `${product.name} has only ${product.inventory.quantity} items in stock` });
       }
 
       const subtotal = product.finalPrice * item.quantity;
@@ -39,9 +47,15 @@ router.post('/', authenticate, async (req, res) => {
         price: product.finalPrice,
         subtotal
       });
+
+      stockUpdates.push({
+        productId: product._id,
+        quantity: item.quantity,
+        name: product.name
+      });
     }
 
-    const tax = Math.round(totalAmount * 0.18); // 18% GST
+    const tax = Math.round(totalAmount * 0.18);
     const finalAmount = totalAmount + tax;
 
     const order = new Order({
@@ -55,6 +69,38 @@ router.post('/', authenticate, async (req, res) => {
     });
 
     await order.save();
+
+    const appliedStock = [];
+    try {
+      for (const update of stockUpdates) {
+        const updatedProduct = await Product.findOneAndUpdate(
+          { _id: update.productId, 'inventory.quantity': { $gte: update.quantity } },
+          {
+            $inc: { 'inventory.quantity': -update.quantity },
+            $set: { updatedAt: new Date() }
+          },
+          { new: true }
+        );
+
+        if (!updatedProduct) {
+          throw new Error(`${update.name || 'Product'} is out of stock`);
+        }
+
+        appliedStock.push(update);
+      }
+    } catch (stockError) {
+      for (const rollback of appliedStock) {
+        await Product.findByIdAndUpdate(
+          rollback.productId,
+          {
+            $inc: { 'inventory.quantity': rollback.quantity },
+            $set: { updatedAt: new Date() }
+          }
+        );
+      }
+      await Order.findByIdAndDelete(order._id);
+      return res.status(400).json({ message: stockError.message });
+    }
 
     if (paymentMethod === 'razorpay' || paymentMethod === 'upi') {
       try {
@@ -86,6 +132,15 @@ router.post('/', authenticate, async (req, res) => {
         });
       } catch (gatewayError) {
         console.error('Razorpay order creation failed:', gatewayError);
+        for (const rollback of stockUpdates) {
+          await Product.findByIdAndUpdate(
+            rollback.productId,
+            {
+              $inc: { 'inventory.quantity': rollback.quantity },
+              $set: { updatedAt: new Date() }
+            }
+          );
+        }
         await Order.findByIdAndDelete(order._id);
         return res.status(500).json({ message: 'Payment initialization failed, please try again.' });
       }
