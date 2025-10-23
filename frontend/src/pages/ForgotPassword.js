@@ -8,21 +8,19 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [resetToken, setResetToken] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMessage('');
     setError('');
-    setResetToken('');
 
     try {
       const { data } = await client.post('/auth/forgot-password', { email });
-      setResetToken(data.resetToken);
-      setMessage('Password reset token generated! Use it on the Reset Password page.');
+      setMessage(data.message || 'If this email is registered, an OTP has been sent');
     } catch (err) {
-      setError(err.response?.data?.message || 'Error generating reset token');
+      setError(err.response?.data?.message || 'Error sending OTP');
+      console.log(err.response?.data?.message);
     } finally {
       setLoading(false);
     }
@@ -34,7 +32,7 @@ export default function ForgotPassword() {
         <div className="card">
           <h2 className="text-3xl font-bold mb-6 text-center">Reset Password</h2>
           <p className="text-gray-600 text-center mb-6">
-            Enter your email address and we'll generate a password reset token for you.
+            Enter your email address and we will send a one-time password (OTP) to reset your password.
           </p>
 
           {message && (
@@ -67,7 +65,7 @@ export default function ForgotPassword() {
               disabled={loading}
               className="w-full btn-primary disabled:opacity-50"
             >
-              {loading ? 'Generating token...' : 'Generate Reset Token'}
+              {loading ? 'Sending OTP...' : 'Send OTP'}
             </button>
 
             <button
@@ -78,21 +76,6 @@ export default function ForgotPassword() {
               Go to Reset Password
             </button>
           </form>
-
-          {resetToken && (
-            <div className="mt-6">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Your Reset Token</label>
-              <textarea
-                readOnly
-                value={resetToken}
-                rows="4"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 font-mono text-xs"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Copy this token and paste it on the Reset Password page within 15 minutes.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

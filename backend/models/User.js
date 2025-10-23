@@ -36,8 +36,12 @@ const userSchema = new mongoose.Schema({
     pincode: String,
     country: String
   },
-  resetPasswordToken: String,
-  resetPasswordExpiry: Date,
+  passwordResetOtp: String,
+  passwordResetOtpExpiry: Date,
+  passwordResetOtpAttempts: {
+    type: Number,
+    default: 0
+  },
   createdAt: {
     type: Date,
     default: Date.now

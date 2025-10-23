@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const multer = require('multer');
+const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 const User = require('../models/User');
 const { authenticate } = require('../middleware/auth');
@@ -27,6 +28,32 @@ const upload = multer({
     }
   }
 });
+
+const transporter = process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS
+  ? nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: Number(process.env.EMAIL_PORT) || 587,
+      secure: process.env.EMAIL_SECURE === 'true',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    })
+  : null;
+
+const sendPasswordResetOtpEmail = async (email, otp) => {
+  if (!transporter) {
+    throw new Error('Email service is not configured');
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: email,
+    subject: 'Ikkat Bazaar password reset OTP',
+    text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+    html: `<p>Your OTP is <strong>${otp}</strong>. It expires in 10 minutes.</p>`
+  });
+};
 
 // Register
 router.post('/register', async (req, res) => {
@@ -106,7 +133,7 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
-// Forgot Password - Generate reset token
+// Forgot Password - Generate OTP
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -118,22 +145,29 @@ router.post('/forgot-password', async (req, res) => {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found with this email' });
+      return res.json({ message: 'If this email is registered, an OTP has been sent' });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const otp = (Math.floor(100000 + Math.random() * 900000)).toString();
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
 
-    // Save token and expiry to user (valid for 15 minutes)
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpiry = new Date(Date.now() + 15 * 60 * 1000);
-    await user.save();
+    user.passwordResetOtp = hashedOtp;
+    user.passwordResetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    user.passwordResetOtpAttempts = 0;
+
+    try {
+      await sendPasswordResetOtpEmail(email, otp);
+      await user.save();
+    } catch (emailError) {
+      user.passwordResetOtp = undefined;
+      user.passwordResetOtpExpiry = undefined;
+      user.passwordResetOtpAttempts = 0;
+      await user.save();
+      return res.status(500).json({ message: 'Failed to send OTP email' });
+    }
 
     res.json({
-      message: 'Password reset token generated',
-      resetToken,
-      expiresIn: '15 minutes'
+      message: 'If this email is registered, an OTP has been sent'
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -143,33 +177,57 @@ router.post('/forgot-password', async (req, res) => {
 // Reset Password
 router.post('/reset-password', async (req, res) => {
   try {
-    const { resetToken, newPassword } = req.body;
+    const { email, otp, newPassword } = req.body;
 
-    if (!resetToken || !newPassword) {
-      return res.status(400).json({ message: 'Reset token and new password required' });
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Email, OTP and new password required' });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    // Hash the received token to compare
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-
-    // Find user with matching token and valid expiry
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpiry: { $gt: new Date() }
-    });
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: 'Invalid or expired reset token' });
+      return res.status(400).json({ message: 'Invalid OTP or email' });
     }
 
-    // Update password
+    if (!user.passwordResetOtp || !user.passwordResetOtpExpiry) {
+      return res.status(400).json({ message: 'Request a new OTP' });
+    }
+
+    const now = new Date();
+
+    if (user.passwordResetOtpExpiry < now) {
+      user.passwordResetOtp = undefined;
+      user.passwordResetOtpExpiry = undefined;
+      user.passwordResetOtpAttempts = 0;
+      await user.save();
+      return res.status(400).json({ message: 'OTP expired. Request a new one.' });
+    }
+
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+
+    if (hashedOtp !== user.passwordResetOtp) {
+      user.passwordResetOtpAttempts = (user.passwordResetOtpAttempts || 0) + 1;
+
+      if (user.passwordResetOtpAttempts >= 5) {
+        user.passwordResetOtp = undefined;
+        user.passwordResetOtpExpiry = undefined;
+        user.passwordResetOtpAttempts = 0;
+        await user.save();
+        return res.status(429).json({ message: 'Too many invalid attempts. Request a new OTP.' });
+      }
+
+      await user.save();
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
     user.password = newPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpiry = undefined;
+    user.passwordResetOtp = undefined;
+    user.passwordResetOtpExpiry = undefined;
+    user.passwordResetOtpAttempts = 0;
     await user.save();
 
     res.json({ message: 'Password reset successfully. Please login with your new password.' });
